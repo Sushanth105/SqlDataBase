@@ -696,7 +696,7 @@ Result :
 | David    | Bob     |
 
 #### Quick Comparison
-
+CASE
 | JOIN Type | Returns                                                              |
 | --------- | -------------------------------------------------------------------- |
 | **INNER** | Only matching rows                                                   |
@@ -705,4 +705,481 @@ Result :
 | **FULL**  | All rows from both, match or not                                     |
 | **CROSS** | All combinations (Cartesian product)                                 |
 | **SELF**  | A table joined with itself (hierarchical or relational within table) |
+---
 
+### Views
+#### Creating Views in MySQL
+```sql
+CREATE VIEW view_name AS
+SELECT column1, column2, ...
+FROM table_name
+WHERE condition;
+```
+Example : 
+```sql
+CREATE VIEW Dept10Employees AS
+SELECT emp_id, emp_name, salary
+FROM Employees
+WHERE dept_id = 10;
+```
+Now you can query the view just like a table:
+```sql
+SELECT * FROM Dept10Employees;
+```
+
+Key points:
+- Views simplify complex queries.
+- They provide security by exposing only certain columns/rows.
+- They act as an abstraction layer over raw tables.
+
+#### Updating Views
+```sql
+UPDATE Dept10Employees
+SET salary = salary + 1000
+WHERE emp_id = 5
+```
+
+Rules for Updatable Views:
+- View must be based on a single table.
+- Must not use aggregate functions (SUM, AVG…), DISTINCT, GROUP BY, or subqueries.
+- Must not contain UNION or HAVING.
+
+#### Dropping Views
+```sql
+DROP VIEW view_name;
+```
+---
+
+### Stored Procedure
+A **Stored Procedure** in MySQL is a set of SQL **statements stored** in the database that can be executed repeatedly by just calling it.
+
+#### Why Use Stored Procedures?
+- Reusability – Write once, use many times.
+- Performance – SQL execution plan is precompiled and stored.
+- Security – Can hide complex queries; users can just call the procedure instead of accessing tables directly.
+- Maintainability – Business logic is centralized in the database.
+- Reduced Network Traffic – Instead of sending multiple SQL queries from application → database, just call one stored procedure.
+
+#### Syntax
+```sql
+DELIMITER $$
+
+CREATE PROCEDURE procedure_name (parameters)
+BEGIN
+    -- SQL statements
+END $$
+
+DELIMITER ;
+```
+#### Breakdown:
+
+- DELIMITER – By default, MySQL ends statements with ;. But inside procedures, we need multiple SQL statements.  
+So, we temporarily change the delimiter (e.g., $$).
+- CREATE PROCEDURE – Creates the procedure.
+- (parameters) – Can be IN, OUT, or INOUT parameters.
+- BEGIN ... END – Block that holds SQL statements.
+
+#### Calling a Stored Procedure
+```sql
+CALL procedure_name(arguments);
+```
+
+#### Parameters in Stored Procedures
+There are 3 types of parameters:
+
+1. **IN (default): Input value (like function arguments).**
+
+Example: Take a customer ID and fetch their details.
+```sql
+DELIMITER $$
+CREATE PROCEDURE GetCustomer(IN cust_id INT)
+BEGIN
+    SELECT * FROM Customers WHERE CustomerID = cust_id;
+END $$
+DELIMITER ;
+
+CALL GetCustomer(3);
+```
+
+2. **OUT: Returns a value back.**
+```sql
+DELIMITER $$
+CREATE PROCEDURE GetTotalCustomers(OUT total INT)
+BEGIN
+    SELECT COUNT(*) INTO total FROM Customers;
+END $$
+DELIMITER ;
+
+CALL GetTotalCustomers(@count);
+SELECT @count;
+```
+
+3. **INOUT: Both input and output.**
+```sql
+DELIMITER $$
+CREATE PROCEDURE DoubleValue(INOUT num INT)
+BEGIN
+    SET num = num * 2;
+END $$
+DELIMITER ;
+
+SET @x = 5;
+CALL DoubleValue(@x);
+SELECT @x;  -- Result: 10
+```
+
+### Control Structures inside Procedures
+Stored procedures support programming-like constructs:
+
+**IF ... ELSE**
+```sql
+IF condition THEN
+    -- statements
+ELSE
+    -- statements
+END IF;
+```
+
+**CASE (like switch)**
+```sql
+CASE var
+    WHEN 1 THEN SET result = 'One';
+    WHEN 2 THEN SET result = 'Two';
+    ELSE SET result = 'Other';
+END CASE;
+```
+
+**LOOP / WHILE / REPEAT**
+```sql
+WHILE i <= 10 DO
+    SET i = i + 1;
+END WHILE;
+```
+
+#### Drop procedure:
+```sql
+DROP PROCEDURE procedure_name;
+```
+
+#### To check all stored procedures in current database:
+```sql
+SHOW PROCEDURE STATUS WHERE Db = 'your_database';
+```
+
+#### Local Variable
+`DECLARE` can only be used inside a stored procedure, function, trigger, or event, and always inside a `BEGIN ... END` block.
+```sql
+DELIMITER $$
+CREATE PROCEDURE TestProc()
+BEGIN
+    DECLARE local_var INT;
+    SET local_var = 5;
+    SELECT local_var;
+END $$
+DELIMITER ;
+```
+
+#### Real-World Example
+```sql
+DELIMITER $$
+
+CREATE PROCEDURE AddProduct(
+    IN p_name VARCHAR(100),
+    IN p_price DECIMAL(10,2),
+    OUT new_id INT
+)
+BEGIN
+    INSERT INTO Products(name, price) VALUES(p_name, p_price);
+    SET new_id = LAST_INSERT_ID();
+END $$
+
+DELIMITER ;
+
+-- Calling it
+CALL AddProduct('Laptop', 75000, @id);
+SELECT @id;
+```
+---
+
+### Functions
+#### What is a Function in MySQL?
+- A Function in MySQL is like a Stored Procedure, but with some differences.
+- It is a stored program that returns a single value and can be used directly in SQL statements.
+- Think of it like functions in programming languages: you give input (parameters), it processes something, and returns a value.
+
+#### Functions vs Stored Procedures
+| Feature                                 | Function                                           | Stored Procedure                                                      |
+| --------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| Return value                            | Must return **exactly one value** (using `RETURN`) | Can return **none, one, or many values** (using `OUT` or result sets) |
+| Use in SQL                              | Can be used in `SELECT`, `WHERE`, `ORDER BY`, etc. | Cannot be used directly in SQL statements (must use `CALL`)           |
+| Parameters                              | Only `IN` parameters                               | Supports `IN`, `OUT`, `INOUT`                                         |
+| DML statements (`INSERT/UPDATE/DELETE`) | Generally not recommended inside functions         | Allowed inside procedures                                             |
+| Invocation                              | Called in SQL queries                              | Called with `CALL`                                                    |
+
+#### Syntax
+```sql
+DELIMITER $$
+
+CREATE FUNCTION function_name (parameters)
+RETURNS datatype
+DETERMINISTIC
+BEGIN
+    -- variable declarations
+    -- SQL statements
+    RETURN value;
+END $$
+
+DELIMITER ;
+```
+**Keywords**:
+- **RETURNS** datatype → must specify what type of value is returned (e.g., INT, VARCHAR).
+- **DETERMINISTIC** → means that given the same input, the function will always return the same output (important for replication).
+- **RETURN** → used to return the final value.
+
+#### Creating and Using a Function
+**Simple Function (Square of a Number)**
+```sql
+DELIMITER $$
+
+CREATE FUNCTION SquareNum(x INT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    RETURN x * x;
+END $$
+
+DELIMITER ;
+
+-- Usage:
+SELECT SquareNum(5);  -- Output: 25
+```
+
+**Function with String**
+```sql
+DELIMITER $$
+
+CREATE FUNCTION GetInitial(name VARCHAR(50))
+RETURNS CHAR(1)
+DETERMINISTIC
+BEGIN
+    RETURN LEFT(name, 1);
+END $$
+
+DELIMITER ;
+
+-- Usage:
+SELECT GetInitial('Sushanth');  -- Output: 'S'
+```
+
+#### Example of a NON-DETERMINISTIC Function
+```sql
+DELIMITER $$
+
+CREATE FUNCTION GetRandom()
+RETURNS INT
+NOT DETERMINISTIC
+BEGIN
+    RETURN FLOOR(RAND() * 100);
+END $$
+
+DELIMITER ;
+
+-- Usage
+SELECT GetRandom();   -- Different result each time
+```
+
+**Function with Table Data**
+```sql
+DELIMITER $$
+
+CREATE FUNCTION TotalOrders(cust_id INT)
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM Orders WHERE customer_id = cust_id;
+    RETURN total;
+END $$
+
+DELIMITER ;
+
+-- Usage:
+SELECT TotalOrders(101);
+```
+
+#### Dropping a Function
+```sql
+DROP FUNCTION function_name;
+```
+#### Viewing Functions
+```sql
+SHOW FUNCTION STATUS WHERE Db = 'your_database';
+```
+
+#### Built-in Functions in MySQL
+
+MySQL already provides hundreds of built-in functions. They fall into categories:
+
+1. **String Functions**
+
+- `CONCAT(s1, s2, …)` → Concatenate strings
+- `LENGTH(s)` → Length of a string
+- `UPPER(s)` / `LOWER(s)` → Convert case
+- `SUBSTRING(s, start, length)`→ Extract substring
+
+2. **Numeric Functions**
+
+- `ABS(x)` → Absolute value
+- `ROUND(x, d)` → Round to d decimal places
+- `CEIL(x)` / `FLOOR(x)` → Ceiling/Floor value
+- `MOD(a, b)` → Remainder
+
+3. **Date and Time Functions**
+
+- `NOW()` → Current timestamp
+- `CURDATE()` / `CURTIME()` → Current date/time
+- `DATEDIFF(d1, d2)` → Difference in days
+- `DATE_ADD(date, INTERVAL x DAY)` → Add interval
+
+4. **Aggregate Functions (used with `GROUP BY`)**
+
+- `COUNT(col)` → Number of rows
+- `SUM(col)` → Total sum
+- `AVG(col)` → Average
+- `MIN(col)` / MAX(col) → Min/Max value
+
+5. **Control Flow Functions**
+
+- `IF(condition, true_value, false_value)`
+- `CASE WHEN … THEN … ELSE … END`
+- `NULLIF(a, b)` → Returns NULL if a = b
+---
+
+### Trigger
+
+A trigger is a special type of stored program in a database that is automatically executed (fired) when a specified event occurs on a particular table or view.
+
+- Unlike stored procedures, triggers are not called explicitly — the database runs them automatically when the event occurs.
+- They are mostly used for **enforcing rules, auditing changes, maintaining logs, and ensuring data integrity.**
+
+#### Events That Can Fire a Trigger
+In MySQL, triggers are associated with DML events (Data Manipulation Language):
+
+- `INSERT` – fires when a new row is inserted.
+- `UPDATE` – fires when a row is modified.
+- `DELETE` – fires when a row is deleted.
+
+⚡ Note: Triggers in MySQL cannot be defined on SELECT, CREATE, DROP, etc.
+
+#### When Does a Trigger Fire? (Timing)
+
+For each event, you can define whether the trigger executes:
+- `BEFORE` – executes before the event.
+- `AFTER` – executes after the event.
+
+So possible triggers are:
+
+- `BEFORE` `INSERT`
+- `AFTER` `INSERT`
+- `BEFORE` ` UPDATE`
+- `AFTER` `UPDATE`
+- `BEFORE` `DELETE`
+- `AFTER` `DELETE`
+
+#### `OLD` and `NEW` Keywords
+Inside a trigger, you can access the row values using these pseudorecords:
+- **NEW.column_name** → the new value (for `INSERT`/`UPDATE`).
+- **OLD.column_name** → the old value (for `UPDATE`/`DELETE`).
+
+| Event  | OLD           | NEW           |
+| ------ | ------------- | ------------- |
+| INSERT | Not available | Available     |
+| UPDATE | Available     | Available     |
+| DELETE | Available     | Not available |
+
+#### Syntax
+```sql
+CREATE TRIGGER trigger_name
+{BEFORE | AFTER} {INSERT | UPDATE | DELETE}
+ON table_name
+FOR EACH ROW
+BEGIN
+    -- Trigger logic here
+END;
+```
+
+#### Logging Inserts
+```sql
+-- Log table
+CREATE TABLE employee_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    emp_id INT,
+    action VARCHAR(50),
+    action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Trigger
+DELIMITER $$
+CREATE TRIGGER after_employee_insert
+AFTER INSERT ON employees
+FOR EACH ROW
+BEGIN
+    INSERT INTO employee_log (emp_id, action)
+    VALUES (NEW.id, 'INSERT');
+END$$
+DELIMITER ;
+```
+
+#### Prevent Negative Salary
+```sql
+DELIMITER $$
+CREATE TRIGGER check_salary
+BEFORE INSERT ON employees
+FOR EACH ROW
+BEGIN
+    IF NEW.salary < 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Salary cannot be negative!';
+    END IF;
+END$$
+DELIMITER ;
+```
+
+#### Audit Updates
+```sql
+CREATE TABLE salary_audit (
+    audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    emp_id INT,
+    old_salary DECIMAL(10,2),
+    new_salary DECIMAL(10,2),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+DELIMITER $$
+CREATE TRIGGER after_salary_update
+AFTER UPDATE ON employees
+FOR EACH ROW
+BEGIN
+    IF OLD.salary <> NEW.salary THEN
+        INSERT INTO salary_audit (emp_id, old_salary, new_salary)
+        VALUES (OLD.id, OLD.salary, NEW.salary);
+    END IF;
+END$$
+DELIMITER ;
+```
+
+#### Show triggers
+```sql
+SHOW TRIGGERS;
+```
+
+#### Drop a trigger
+```sql
+DROP TRIGGER IF EXISTS trigger_name;
+```
+
+#### Check trigger details
+```sql
+SELECT * FROM information_schema.triggers
+WHERE trigger_schema = 'your_database';
+```
