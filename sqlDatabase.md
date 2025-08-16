@@ -551,3 +551,158 @@ LIMIT 2 OFFSET 2;
 - Skips top 2 highest salaries.
 - Returns next 2 employees by salary.
 ---
+### `JOIN`
+#### Example Tables
+Table: `Customers`
+| customer\_id | name    |
+| ------------ | ------- |
+| 1            | Alice   |
+| 2            | Bob     |
+| 3            | Charlie |
+
+Table: `Orders`
+
+| order\_id | customer\_id | amount |
+| --------- | ------------ | ------ |
+| 101       | 1            | 500    |
+| 102       | 2            | 300    |
+| 103       | 2            | 700    |
+| 104       | 4            | 200    |
+
+#### INNER JOIN
+- Returns only matching rows between tables.
+- Excludes non-matching rows.
+
+```sql
+SELECT Customers.name, Orders.amount
+FROM Customers
+INNER JOIN Orders
+ON Customers.customer_id = Orders.customer_id;
+```
+Result : 
+| name  | amount |
+| ----- | ------ |
+| Alice | 500    |
+| Bob   | 300    |
+| Bob   | 700    |
+
+#### LEFT JOIN (LEFT OUTER JOIN)
+
+- Returns all rows from the left table (`Customers`).
+- If no match, `NULL` is returned for right table columns.
+```sql
+SELECT Customers.name, Orders.amount
+FROM Customers
+LEFT JOIN Orders
+ON Customers.customer_id = Orders.customer_id;
+```
+Result : 
+| name    | amount |
+| ------- | ------ |
+| Alice   | 500    |
+| Bob     | 300    |
+| Bob     | 700    |
+| Charlie | NULL   |
+
+#### RIGHT JOIN (RIGHT OUTER JOIN)
+- Opposite of LEFT JOIN.
+- Returns all rows from the right table (`Orders`).
+- If no match, `NULL` for left table columns.
+```sql
+SELECT Customers.name, Orders.amount
+FROM Customers
+RIGHT JOIN Orders
+ON Customers.customer_id = Orders.customer_id;
+```
+Result : 
+| name  | amount |
+| ----- | ------ |
+| Alice | 500    |
+| Bob   | 300    |
+| Bob   | 700    |
+| NULL  | 200    |
+
+#### FULL JOIN (FULL OUTER JOIN)
+- Returns all rows from both tables.
+- If no match, NULL is filled.
+- MySQL does not directly support FULL JOIN, but you can simulate it with UNION:
+
+```sql
+SELECT Customers.name, Orders.amount
+FROM Customers
+LEFT JOIN Orders
+ON Customers.customer_id = Orders.customer_id
+UNION
+SELECT Customers.name, Orders.amount
+FROM Customers
+RIGHT JOIN Orders
+ON Customers.customer_id = Orders.customer_id;
+```
+
+Result : 
+| name    | amount |
+| ------- | ------ |
+| Alice   | 500    |
+| Bob     | 300    |
+| Bob     | 700    |
+| Charlie | NULL   |
+| NULL    | 200    |
+
+#### CROSS JOIN
+- Cartesian product: all combinations of rows.
+- If 3 customers × 4 orders → 12 rows.
+
+```sql
+SELECT Customers.name, Orders.amount
+FROM Customers
+CROSS JOIN Orders;
+```
+
+Result : 
+| name  | amount |
+| ----- | ------ |
+| Alice | 500    |
+| Alice | 300    |
+| Alice | 700    |
+| Alice | 200    |
+| Bob   | 500    |
+| ...   | ...    |
+
+#### SELF JOIN
+- Table joins with itself.
+- Useful for hierarchical data (like employees and managers).
+
+Example Table: `Employees`
+| emp\_id | name    | manager\_id |
+| ------- | ------- | ----------- |
+| 1       | Alice   | NULL        |
+| 2       | Bob     | 1           |
+| 3       | Charlie | 1           |
+| 4       | David   | 2           |
+
+Find employees and their managers:
+```sql
+SELECT e1.name AS employee, e2.name AS manager
+FROM Employees e1
+LEFT JOIN Employees e2
+ON e1.manager_id = e2.emp_id;
+```
+Result : 
+| employee | manager |
+| -------- | ------- |
+| Alice    | NULL    |
+| Bob      | Alice   |
+| Charlie  | Alice   |
+| David    | Bob     |
+
+#### Quick Comparison
+
+| JOIN Type | Returns                                                              |
+| --------- | -------------------------------------------------------------------- |
+| **INNER** | Only matching rows                                                   |
+| **LEFT**  | All from left + matches from right                                   |
+| **RIGHT** | All from right + matches from left                                   |
+| **FULL**  | All rows from both, match or not                                     |
+| **CROSS** | All combinations (Cartesian product)                                 |
+| **SELF**  | A table joined with itself (hierarchical or relational within table) |
+
